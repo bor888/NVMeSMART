@@ -27,7 +27,7 @@ internal static class SMART
 
         using SafeFileHandle sfh = PInvoke.CreateFile(drv, 0, FILE_SHARE_MODE.FILE_SHARE_READ | FILE_SHARE_MODE.FILE_SHARE_WRITE,
                                                         null, FILE_CREATION_DISPOSITION.OPEN_EXISTING, 0, null);
-        // DesiredAccess = 0, no need for ADMIN, maybe?!
+                                                        // DesiredAccess = 0, no need for ADMIN, maybe?!
 
         if (sfh.IsInvalid == true)
         {
