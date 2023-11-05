@@ -1,0 +1,117 @@
+    BOOL    result;
+    PVOID   buffer = NULL;
+    ULONG   bufferLength = 0;
+    ULONG   returnedLength = 0;
+
+    PSTORAGE_PROPERTY_QUERY query = NULL;
+    PSTORAGE_PROTOCOL_SPECIFIC_DATA protocolData = NULL;
+    PSTORAGE_PROTOCOL_DATA_DESCRIPTOR protocolDataDescr = NULL;
+
+    //
+    // Allocate buffer for use.
+    //
+    bufferLength = FIELD_OFFSET(STORAGE_PROPERTY_QUERY, AdditionalParameters) + sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA) + NVME_MAX_LOG_SIZE;
+    buffer = malloc(bufferLength);
+
+    if (buffer == NULL) {
+        _tprintf(_T("DeviceNVMeQueryProtocolDataTest: allocate buffer failed, exit.\n"));
+        goto exit;
+    }
+
+    //
+    // Initialize query data structure to get Identify Controller Data.
+    //
+    ZeroMemory(buffer, bufferLength);
+
+    query = (PSTORAGE_PROPERTY_QUERY)buffer;
+    protocolDataDescr = (PSTORAGE_PROTOCOL_DATA_DESCRIPTOR)buffer;
+    protocolData = (PSTORAGE_PROTOCOL_SPECIFIC_DATA)query->AdditionalParameters;
+
+    query->PropertyId = StorageAdapterProtocolSpecificProperty;
+    query->QueryType = PropertyStandardQuery;
+
+    protocolData->ProtocolType = ProtocolTypeNvme;
+    protocolData->DataType = NVMeDataTypeIdentify;
+    protocolData->ProtocolDataRequestValue = NVME_IDENTIFY_CNS_CONTROLLER;
+    protocolData->ProtocolDataRequestSubValue = 0;
+    protocolData->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);
+    protocolData->ProtocolDataLength = NVME_MAX_LOG_SIZE;
+
+    //
+    // Send request down.
+    //
+    result = DeviceIoControl(DeviceList[Index].Handle,
+                             IOCTL_STORAGE_QUERY_PROPERTY,
+                             buffer,
+                             bufferLength,
+                             buffer,
+                             bufferLength,
+                             &returnedLength,
+                             NULL
+                             );
+
+/* this section is the problem ========================================================================    
+
+    ZeroMemory(buffer, bufferLength);
+    query = (PSTORAGE_PROPERTY_QUERY)buffer;  
+    protocolDataDescr = (PSTORAGE_PROTOCOL_DATA_DESCRIPTOR)buffer;  
+    protocolData = (PSTORAGE_PROTOCOL_SPECIFIC_DATA)query->AdditionalParameters;  
+
+    query->PropertyId = StorageDeviceProtocolSpecificProperty;  
+    query->QueryType = PropertyStandardQuery;  
+
+    protocolData->ProtocolType = ProtocolTypeNvme;  
+    protocolData->DataType = NVMeDataTypeLogPage;  
+    protocolData->ProtocolDataRequestValue = NVME_LOG_PAGE_HEALTH_INFO;  
+    protocolData->ProtocolDataRequestSubValue = 0;  
+    protocolData->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);  
+    protocolData->ProtocolDataLength = sizeof(NVME_HEALTH_INFO_LOG);  
+
+    //  
+    // Send request down.  
+    //  
+    result = DeviceIoControl(DeviceList[Index].Handle,  
+                             IOCTL_STORAGE_QUERY_PROPERTY,  
+                             buffer,  
+                             bufferLength,  
+                             buffer, 
+                             bufferLength,  
+                             &returnedLength,  
+                             NULL  
+                             );  
+
+================================================================================================ */
+
+    // should check 'result'
+
+    //
+    // Validate the returned data.
+    //
+    if ((protocolDataDescr->Version != sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR)) ||
+        (protocolDataDescr->Size != sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR))) {
+        _tprintf(_T("DeviceNVMeQueryProtocolDataTest: Get Identify Controller Data - data descriptor header not valid.\n"));
+        return;
+    }
+
+    protocolData = &protocolDataDescr->ProtocolSpecificData;
+
+    if ((protocolData->ProtocolDataOffset < sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)) ||
+        (protocolData->ProtocolDataLength < NVME_MAX_LOG_SIZE)) {
+        _tprintf(_T("DeviceNVMeQueryProtocolDataTest: Get Identify Controller Data - ProtocolData Offset/Length not valid.\n"));
+        goto exit;
+    }
+
+    //
+    // Identify Controller Data 
+    //
+    {
+        PNVME_IDENTIFY_CONTROLLER_DATA identifyControllerData = (PNVME_IDENTIFY_CONTROLLER_DATA)((PCHAR)protocolData + protocolData->ProtocolDataOffset);
+
+        if ((identifyControllerData->VID == 0) ||
+            (identifyControllerData->NN == 0)) {
+            _tprintf(_T("DeviceNVMeQueryProtocolDataTest: Identify Controller Data not valid.\n"));
+            goto exit;
+        } else {
+            _tprintf(_T("DeviceNVMeQueryProtocolDataTest: ***Identify Controller Data succeeded***.\n"));
+        }
+    }
